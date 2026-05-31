@@ -2,10 +2,12 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
 	"os"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/term"
 )
 
 type selection struct {
@@ -14,6 +16,9 @@ type selection struct {
 }
 
 func main() {
+	printFlag := flag.Bool("print", false, "Print selection as JSON and exit (non-interactive mode)")
+	flag.Parse()
+
 	tty, err := os.OpenFile("/dev/tty", os.O_RDWR, 0)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: cannot open /dev/tty: %v\n", err)
@@ -21,8 +26,10 @@ func main() {
 	}
 	defer tty.Close()
 
+	printMode := *printFlag || !term.IsTerminal(os.Stdout.Fd())
+
 	p := tea.NewProgram(
-		model{selectedIndex: -1},
+		model{selectedIndex: -1, printMode: printMode},
 		tea.WithInput(tty),
 		tea.WithOutput(tty),
 	)

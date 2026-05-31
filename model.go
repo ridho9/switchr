@@ -2,7 +2,9 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"os"
+	"os/exec"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -30,6 +32,35 @@ var (
 			Background(lipgloss.Color("24"))
 )
 
+type sessionFinishedMsg struct{}
+
+// titledCmd wraps an exec.Cmd to set the terminal title before running.
+type titledCmd struct {
+	*exec.Cmd
+	title string
+}
+
+func (c *titledCmd) Run() error {
+	fmt.Fprintf(c.Stdout, "\033]0;%s\007", c.title)
+	return c.Cmd.Run()
+}
+
+func (c *titledCmd) SetStdin(r io.Reader) {
+	if c.Cmd.Stdin == nil {
+		c.Cmd.Stdin = r
+	}
+}
+
+func (c *titledCmd) SetStdout(w io.Writer) {
+	c.Cmd.Stdout = w
+}
+
+func (c *titledCmd) SetStderr(w io.Writer) {
+	if c.Cmd.Stderr == nil {
+		c.Cmd.Stderr = w
+	}
+}
+
 type model struct {
 	sessions      []session
 	err           error
@@ -37,6 +68,7 @@ type model struct {
 	width         int
 	height        int
 	selectedIndex int
+	printMode     bool
 
 	treeData    *sessionTreeData
 	treeLoading bool
@@ -57,8 +89,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		case "enter":
 			if len(m.sessions) > 0 && m.cursor < len(m.sessions) {
-				m.selectedIndex = m.cursor
-				return m, tea.Quit
+				if m.printMode {
+					m.selectedIndex = m.cursor
+					return m, tea.Quit
+				}
+				sess := m.sessions[m.cursor]
+				cmd := &titledCmd{
+					Cmd:   exec.Command("herdr", "session", "attach", sess.Name),
+					title: fmt.Sprintf("herdr: %s", sess.Name),
+				}
+				return m, tea.Exec(cmd, func(err error) tea.Msg {
+					return sessionFinishedMsg{}
+				})
 			}
 		case "up", "k":
 			if m.cursor > 0 {
@@ -88,6 +130,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.sessions = msg.sessions
 		}
 		return m, m.loadTreeIfNeeded()
+
+	case sessionFinishedMsg:
+		// Session ended; TUI resumes automatically.
+		return m, nil
 
 	case treeDataMsg:
 		m.treeLoading = false
@@ -142,6 +188,7 @@ func (m model) View() tea.View {
 
 	v := tea.NewView(content)
 	v.AltScreen = true
+	v.WindowTitle = m.windowTitle()
 	return v
 }
 
@@ -292,4 +339,8 @@ func shortenPath(path string) string {
 		return "~" + path[len(home):]
 	}
 	return path
+}
+
+func (m model) windowTitle() string {
+	return "switcher"
 }
