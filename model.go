@@ -170,23 +170,21 @@ func (m model) renderLeft(colWidth int) string {
 		}
 
 		leftPart := cursor + "[" + indexToLabel(i) + "] " + sess.Name
-		styledStatus := statusStyle.Render(status)
-
-		visibleLeft := lipgloss.Width(leftPart)
-		visibleStatus := lipgloss.Width(status)
-		padding := contentWidth - visibleLeft - visibleStatus
-		if padding < 1 {
-			padding = 1
-		}
+		remaining := max(contentWidth-lipgloss.Width(leftPart), 1)
 
 		if m.cursor == i {
-			// Use plain status text so the highlight background isn't
-			// reset by the styled status's \x1b[0m.
-			line := leftPart + strings.Repeat(" ", padding) + status
+			// Plain style (no color) so ANSI reset doesn't clear highlight bg.
+			line := leftPart + lipgloss.NewStyle().
+				Width(remaining).
+				Align(lipgloss.Right).
+				Render(status)
 			line = highlightStyle.Width(contentWidth).Render(line)
 			s += line + "\n"
 		} else {
-			s += leftPart + strings.Repeat(" ", padding) + styledStatus + "\n"
+			s += leftPart + statusStyle.
+				Width(remaining).
+				Align(lipgloss.Right).
+				Render(status) + "\n"
 		}
 	}
 
@@ -234,10 +232,11 @@ func (m model) renderRight() string {
 		return header + fmt.Sprintf("\nError: %v", m.treeErr)
 	}
 
-	return header + "\n" + m.buildTree()
+	contentWidth := m.width/2 - 2 // normal border: 1 char each side
+	return header + "\n" + m.buildTree(contentWidth)
 }
 
-func (m model) buildTree() string {
+func (m model) buildTree(width int) string {
 	data := m.treeData
 	if data == nil {
 		return ""
@@ -254,6 +253,9 @@ func (m model) buildTree() string {
 	}
 
 	t := tree.New()
+	if width > 0 {
+		t.Width(width)
+	}
 
 	for _, ws := range data.Workspaces {
 		wsTree := tree.Root(focusLabel(ws.Focused, ws.Label))
