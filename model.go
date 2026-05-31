@@ -25,11 +25,12 @@ var (
 )
 
 type model struct {
-	sessions []session
-	err      error
-	cursor   int
-	width    int
-	height   int
+	sessions      []session
+	err           error
+	cursor        int
+	width         int
+	height        int
+	selectedIndex int
 }
 
 func (m model) Init() tea.Cmd {
@@ -40,8 +41,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyPressMsg:
 		switch msg.String() {
-		case "q", "ctrl+c":
+		case "q", "esc", "ctrl+c":
+			m.selectedIndex = -1
 			return m, tea.Quit
+		case "enter":
+			if len(m.sessions) > 0 && m.cursor < len(m.sessions) {
+				m.selectedIndex = m.cursor
+				return m, tea.Quit
+			}
 		case "up", "k":
 			if m.cursor > 0 {
 				m.cursor--

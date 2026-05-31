@@ -51,4 +51,3 @@ func isSessionAttached(serverSocket string) bool {
 	// Heuristic: >2 lines (header + single server fd = 2 lines) means attached.
 	return len(out) > 0 && bytes.Count(out, []byte("\n")) > 2
 }
-
