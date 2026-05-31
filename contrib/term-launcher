@@ -1,0 +1,22 @@
+#!/bin/sh
+# term-launcher — run switcher on terminal startup, fall back to shell.
+#
+# Usage: point your terminal emulator at this script.
+#
+#   Ghostty:  command = /path/to/term-launcher
+#   Kitty:    launch -- /path/to/term-launcher
+#   WezTerm:  default_prog = { "/path/to/term-launcher" }
+#   Alacritty: shell = { program = "/path/to/term-launcher" }
+
+DIR="$(cd "$(dirname "$0")" && pwd)"
+SWITCHER="$DIR/switcher"
+[ ! -x "$SWITCHER" ] && SWITCHER="switcher"  # fall back to PATH (go install)
+
+# Already inside a herdr session — skip switcher, start shell directly.
+[ -n "${HERDR_SESSION:-}" ] && exec "${SHELL:-/bin/sh}" -l
+
+# Run switcher through the login shell to inherit the login environment (PATH, etc.).
+"${SHELL:-/bin/sh}" -l -c "exec '$SWITCHER'"
+
+# Quit / no selection — drop to shell.
+exec "${SHELL:-/bin/sh}" -l
