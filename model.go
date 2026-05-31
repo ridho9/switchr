@@ -8,52 +8,18 @@ import (
 )
 
 var (
-	leftBorderColor  = lipgloss.Color("63")  // blue
-	rightBorderColor = lipgloss.Color("204") // pink
-	cursorColor      = lipgloss.Color("212") // light pink
-)
-
-var (
-	leftPanelStyle = lipgloss.NewStyle().
+	leftStyle = lipgloss.NewStyle().
 			Border(lipgloss.NormalBorder()).
-			BorderForeground(leftBorderColor)
+			BorderForeground(lipgloss.Color("63"))
 
-	rightPanelStyle = lipgloss.NewStyle().
+	rightStyle = lipgloss.NewStyle().
 			Border(lipgloss.NormalBorder()).
-			BorderForeground(rightBorderColor)
-
-	cursorStyle = lipgloss.NewStyle().
-			Foreground(cursorColor).
-			Bold(true)
+			BorderForeground(lipgloss.Color("204"))
 )
 
 type model struct {
-	items    []string
-	details  []string
-	cursor   int
-	selected int
-	width    int
-	height   int
-}
-
-func initialModel() model {
-	return model{
-		items: []string{
-			"Project Alpha",
-			"Design System",
-			"API Gateway",
-			"Auth Service",
-			"Dashboard",
-		},
-		details: []string{
-			"Frontend rewrite in React\nStatus: In Progress",
-			"Shared component library\nStatus: Review",
-			"Rate limiting & routing\nStatus: Planning",
-			"OAuth2 + JWT tokens\nStatus: Done",
-			"Admin analytics panel\nStatus: Backlog",
-		},
-		selected: -1,
-	}
+	width  int
+	height int
 }
 
 func (m model) Init() tea.Cmd {
@@ -63,72 +29,30 @@ func (m model) Init() tea.Cmd {
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyPressMsg:
-		switch msg.String() {
-		case "q", "ctrl+c":
-			return m, tea.Quit
-
-		case "up", "k":
-			if m.cursor > 0 {
-				m.cursor--
-			}
-
-		case "down", "j":
-			if m.cursor < len(m.items)-1 {
-				m.cursor++
-			}
-
-		case "enter":
-			m.selected = m.cursor
-		}
-
+		return m, tea.Quit
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
 	}
-
 	return m, nil
 }
 
 func (m model) View() tea.View {
 	colWidth := m.width / 2
 
-	left := leftPanelStyle.
+	left := leftStyle.
 		Width(colWidth).
 		Height(m.height - 2).
-		Render(m.renderList())
+		Render(fmt.Sprintf("Left Panel\n\nPress q to quit."))
 
-	right := rightPanelStyle.
+	right := rightStyle.
 		Width(colWidth).
 		Height(m.height - 2).
-		Render(m.renderDetail())
+		Render(fmt.Sprintf("Right Panel\n\nResize to see layout."))
 
 	content := lipgloss.JoinHorizontal(lipgloss.Top, left, right)
 
 	v := tea.NewView(content)
 	v.AltScreen = true
 	return v
-}
-
-func (m model) renderList() string {
-	s := "Contexts\n\n"
-	for i, item := range m.items {
-		cursor := "  "
-		if m.cursor == i {
-			cursor = "> "
-		}
-		line := fmt.Sprintf("%s%s\n", cursor, item)
-		if m.cursor == i {
-			line = cursorStyle.Render(line)
-		}
-		s += line
-	}
-	s += "\n↑↓ navigate  ↵ switch  q quit"
-	return s
-}
-
-func (m model) renderDetail() string {
-	if m.selected == -1 {
-		return "Select a context\nto see details."
-	}
-	return fmt.Sprintf("%s\n\n%s", m.items[m.selected], m.details[m.selected])
 }
