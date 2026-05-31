@@ -21,6 +21,12 @@ var (
 	detachedStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.BrightBlack)
 
+	runningStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Green)
+
+	stoppedStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.BrightBlack)
+
 	highlightStyle = lipgloss.NewStyle().
 			Background(lipgloss.Blue)
 )

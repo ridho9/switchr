@@ -48,29 +48,50 @@ func (m model) renderLeft(colWidth int) string {
 			cursor = "> "
 		}
 
-		status := "(detached)"
-		statusStyle := detachedStyle
-		if sess.Attached {
-			status = "(attached)"
-			statusStyle = attachedStyle
+		icon := "○"
+		iconStyle := stoppedStyle
+		if sess.Running {
+			icon = "●"
+			iconStyle = runningStyle
 		}
 
-		leftPart := cursor + "[" + indexToLabel(i) + "] " + sess.Name
-		remaining := max(contentWidth-lipgloss.Width(leftPart), 1)
+		prefix := cursor + "[" + indexToLabel(i) + "] "
+		styledIcon := iconStyle.Render(icon)
+		leftPart := prefix + styledIcon + " " + sess.Name
 
 		if m.cursor == i {
-			// Plain style (no color) so ANSI reset doesn't clear highlight bg.
-			line := leftPart + lipgloss.NewStyle().
-				Width(remaining).
-				Align(lipgloss.Right).
-				Render(status)
+			// Plain text (no color) so ANSI reset doesn't clear highlight bg.
+			plainLeft := prefix + icon + " " + sess.Name
+			line := lipgloss.NewStyle().Width(contentWidth).Render(plainLeft)
+			if sess.Running {
+				status := "(detached)"
+				if sess.Attached {
+					status = "(attached)"
+				}
+				remaining := max(contentWidth-lipgloss.Width(plainLeft), 1)
+				line = plainLeft + lipgloss.NewStyle().
+					Width(remaining).
+					Align(lipgloss.Right).
+					Render(status)
+			}
 			line = highlightStyle.Width(contentWidth).Render(line)
 			s += line + "\n"
 		} else {
-			s += leftPart + statusStyle.
-				Width(remaining).
-				Align(lipgloss.Right).
-				Render(status) + "\n"
+			if sess.Running {
+				status := "(detached)"
+				statusStyle := detachedStyle
+				if sess.Attached {
+					status = "(attached)"
+					statusStyle = attachedStyle
+				}
+				remaining := max(contentWidth-lipgloss.Width(leftPart), 1)
+				s += leftPart + statusStyle.
+					Width(remaining).
+					Align(lipgloss.Right).
+					Render(status) + "\n"
+			} else {
+				s += lipgloss.NewStyle().Width(contentWidth).Render(leftPart) + "\n"
+			}
 		}
 	}
 

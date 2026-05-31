@@ -72,8 +72,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.loadTreeIfNeeded()
 
 	case sessionFinishedMsg:
-		// Session ended; TUI resumes automatically.
-		return m, nil
+		return m, loadSessions
 
 	case treeDataMsg:
 		m.treeLoading = false
