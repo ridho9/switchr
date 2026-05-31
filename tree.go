@@ -10,6 +10,9 @@ import (
 	"charm.land/lipgloss/v2/tree"
 )
 
+// borderWidth is the space taken by NormalBorder (1 cell each side).
+const borderWidth = 2
+
 func (m *model) loadTreeIfNeeded() tea.Cmd {
 	if len(m.sessions) == 0 || m.cursor >= len(m.sessions) {
 		return nil
@@ -31,8 +34,15 @@ func (m *model) loadTreeIfNeeded() tea.Cmd {
 	return loadSessionTree(sess.Name)
 }
 
-func (m model) renderLeft(colWidth int) string {
-	contentWidth := colWidth - 2 // normal border takes 1 char each side
+func statusParts(sess session) (string, lipgloss.Style) {
+	if sess.Attached {
+		return "(attached)", attachedStyle
+	}
+	return "(detached)", detachedStyle
+}
+
+func (m model) renderLeft(colWidth, panelHeight int) string {
+	contentWidth := colWidth - borderWidth
 	s := "Herdr:\n\n"
 
 	if m.err != nil {
@@ -41,17 +51,56 @@ func (m model) renderLeft(colWidth int) string {
 	if m.sessions == nil {
 		return s + "Loading..."
 	}
+	if len(m.sessions) == 0 {
+		return s + "No sessions."
+	}
 
-	for i, sess := range m.sessions {
+	contentHeight := panelHeight - borderWidth
+	maxVisible := contentHeight - 3 // header = 3 lines
+	if maxVisible < 1 {
+		maxVisible = 1
+	}
+
+	so := m.scrollOffset
+	maxOffset := max(0, len(m.sessions)-1)
+	if so > maxOffset {
+		so = maxOffset
+	}
+	if so < 0 {
+		so = 0
+	}
+
+	hasAbove := so > 0
+	hasBelow := so+maxVisible < len(m.sessions)
+
+	visibleCount := maxVisible
+	if hasAbove {
+		visibleCount--
+	}
+	if hasBelow {
+		visibleCount--
+	}
+	if visibleCount < 1 {
+		visibleCount = 1
+	}
+
+	end := min(so+visibleCount, len(m.sessions))
+
+	if hasAbove {
+		s += "  \u00b7\u00b7\u00b7\n"
+	}
+
+	for i := so; i < end; i++ {
+		sess := m.sessions[i]
 		cursor := "  "
 		if m.cursor == i {
 			cursor = "> "
 		}
 
-		icon := "○"
+		icon := "\u25cb"
 		iconStyle := stoppedStyle
 		if sess.Running {
-			icon = "●"
+			icon = "\u25cf"
 			iconStyle = runningStyle
 		}
 
@@ -59,46 +108,42 @@ func (m model) renderLeft(colWidth int) string {
 		styledIcon := iconStyle.Render(icon)
 		leftPart := prefix + styledIcon + " " + sess.Name
 
+		statusText, statusStyle := statusParts(sess)
+
 		if m.cursor == i {
 			// Plain text (no color) so ANSI reset doesn't clear highlight bg.
 			plainLeft := prefix + icon + " " + sess.Name
 			line := lipgloss.NewStyle().Width(contentWidth).Render(plainLeft)
 			if sess.Running {
-				status := "(detached)"
-				if sess.Attached {
-					status = "(attached)"
-				}
 				remaining := max(contentWidth-lipgloss.Width(plainLeft), 1)
 				line = plainLeft + lipgloss.NewStyle().
 					Width(remaining).
 					Align(lipgloss.Right).
-					Render(status)
+					Render(statusText)
 			}
 			line = highlightStyle.Width(contentWidth).Render(line)
 			s += line + "\n"
 		} else {
 			if sess.Running {
-				status := "(detached)"
-				statusStyle := detachedStyle
-				if sess.Attached {
-					status = "(attached)"
-					statusStyle = attachedStyle
-				}
 				remaining := max(contentWidth-lipgloss.Width(leftPart), 1)
 				s += leftPart + statusStyle.
 					Width(remaining).
 					Align(lipgloss.Right).
-					Render(status) + "\n"
+					Render(statusText) + "\n"
 			} else {
 				s += lipgloss.NewStyle().Width(contentWidth).Render(leftPart) + "\n"
 			}
 		}
 	}
 
+	if hasBelow {
+		s += "  \u00b7\u00b7\u00b7\n"
+	}
+
 	return s
 }
 
-func (m model) renderRight() string {
+func (m model) renderRight(panelHeight int) string {
 	if len(m.sessions) == 0 || m.cursor >= len(m.sessions) {
 		return "Session Info\n\nNo session available."
 	}
@@ -118,8 +163,25 @@ func (m model) renderRight() string {
 		return header + fmt.Sprintf("\nError: %v", m.treeErr)
 	}
 
-	contentWidth := m.width/2 - 2 // normal border: 1 char each side
-	return header + "\n" + m.buildTree(contentWidth)
+	contentWidth := m.width/2 - borderWidth
+	treeStr := m.buildTree(contentWidth)
+
+	// Truncate tree if it exceeds available height.
+	headerLines := 2 // "Session: name\n" + blank line
+	contentHeight := panelHeight - borderWidth
+	maxTreeLines := contentHeight - headerLines
+	if maxTreeLines < 1 {
+		maxTreeLines = 1
+	}
+
+	lines := strings.Split(treeStr, "\n")
+	if len(lines) > maxTreeLines {
+		lines = lines[:maxTreeLines-1]
+		lines = append(lines, "\u00b7\u00b7\u00b7")
+		treeStr = strings.Join(lines, "\n")
+	}
+
+	return header + "\n" + treeStr
 }
 
 func (m model) buildTree(width int) string {

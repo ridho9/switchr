@@ -11,6 +11,7 @@ type model struct {
 	sessions      []session
 	err           error
 	cursor        int
+	scrollOffset  int
 	width         int
 	height        int
 	selectedIndex int
@@ -45,16 +46,19 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, defaultKeyMap.Up):
 			if m.cursor > 0 {
 				m.cursor--
+				m.scrollToCursor()
 			}
 			return m, m.loadTreeIfNeeded()
 		case key.Matches(msg, defaultKeyMap.Down):
 			if m.cursor < len(m.sessions)-1 {
 				m.cursor++
+				m.scrollToCursor()
 			}
 			return m, m.loadTreeIfNeeded()
 		default:
 			if n, ok := keyToIndex(msg.String()); ok && n >= 0 && n < len(m.sessions) {
 				m.cursor = n
+				m.scrollToCursor()
 				return m, m.loadTreeIfNeeded()
 			}
 		}
@@ -62,12 +66,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
+		m.snapScrollUp()
+		m.scrollToCursor()
 
 	case sessionListMsg:
 		if msg.err != nil {
 			m.err = msg.err
 		} else {
 			m.sessions = msg.sessions
+			m.clampBounds()
 		}
 		return m, m.loadTreeIfNeeded()
 
@@ -76,6 +83,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.treeFor = ""
 		m.treeLoading = false
 		m.treeErr = nil
+		m.scrollOffset = 0
 		return m, loadSessions
 
 	case treeDataMsg:
@@ -94,26 +102,79 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m model) View() tea.View {
-	colWidth := m.width / 2
+func (m model) panelContentHeight() int {
 	helpView := lipgloss.NewStyle().PaddingLeft(2).Render(m.help.View(defaultKeyMap))
 	helpHeight := lipgloss.Height(helpView)
-	panelHeight := m.height - 2 - helpHeight
-	if panelHeight < 1 {
-		panelHeight = 1
+	ph := m.height - helpHeight
+	if ph < 1 {
+		ph = 1
 	}
+	return ph
+}
 
+// scrollToCursor adjusts scrollOffset so the cursor is visible.
+func (m *model) scrollToCursor() {
+	vc := max(m.visibleSessionCount()-2, 1) // indicators may take up to 2 lines
+	if m.cursor < m.scrollOffset {
+		m.scrollOffset = m.cursor
+	} else if m.cursor >= m.scrollOffset+vc {
+		m.scrollOffset = m.cursor - vc + 1
+	}
+	if m.scrollOffset < 0 {
+		m.scrollOffset = 0
+	}
+}
+
+// snapScrollUp reduces scrollOffset after the terminal grows, so the top
+// indicator disappears when there's now enough room to show earlier sessions.
+func (m *model) snapScrollUp() {
+	vc := max(m.visibleSessionCount()-2, 1)
+	potential := max(0, m.cursor-vc+1)
+	if potential < m.scrollOffset {
+		m.scrollOffset = potential
+	}
+}
+
+// visibleSessionCount returns how many session lines fit in the left panel.
+func (m model) visibleSessionCount() int {
+	n := m.panelContentHeight() - borderWidth - 3 // header = "Herdr:\n\n"
+	if n < 1 {
+		n = 1
+	}
+	return n
+}
+
+// clampBounds resets cursor and scrollOffset if the session list shrunk.
+func (m *model) clampBounds() {
+	if len(m.sessions) == 0 {
+		m.cursor = 0
+		m.scrollOffset = 0
+		return
+	}
+	if m.cursor >= len(m.sessions) {
+		m.cursor = len(m.sessions) - 1
+	}
+	maxOffset := max(0, len(m.sessions)-1)
+	if m.scrollOffset > maxOffset {
+		m.scrollOffset = maxOffset
+	}
+}
+
+func (m model) View() tea.View {
+	colWidth := m.width / 2
 	m.help.SetWidth(m.width)
+	panelHeight := m.panelContentHeight()
+	helpView := lipgloss.NewStyle().PaddingLeft(2).Render(m.help.View(defaultKeyMap))
 
 	left := leftStyle.
 		Width(colWidth).
 		Height(panelHeight).
-		Render(m.renderLeft(colWidth))
+		Render(m.renderLeft(colWidth, panelHeight))
 
 	right := rightStyle.
 		Width(colWidth).
 		Height(panelHeight).
-		Render(m.renderRight())
+		Render(m.renderRight(panelHeight))
 
 	content := lipgloss.JoinHorizontal(lipgloss.Top, left, right)
 	full := lipgloss.JoinVertical(lipgloss.Left, content, helpView)
