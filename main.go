@@ -29,7 +29,7 @@ func main() {
 	printMode := *printFlag || !term.IsTerminal(os.Stdout.Fd())
 
 	p := tea.NewProgram(
-		model{selectedIndex: -1, printMode: printMode},
+		model{selectedIndex: -1, printMode: printMode, help: swHelp()},
 		tea.WithInput(tty),
 		tea.WithOutput(tty),
 	)

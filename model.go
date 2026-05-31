@@ -2,64 +2,13 @@ package main
 
 import (
 	"fmt"
-	"io"
-	"os"
 	"os/exec"
-	"strings"
 
+	"charm.land/bubbles/v2/help"
+	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
-	"charm.land/lipgloss/v2/tree"
 )
-
-var (
-	leftStyle = lipgloss.NewStyle().
-			Border(lipgloss.NormalBorder()).
-			BorderForeground(lipgloss.Magenta)
-
-	rightStyle = lipgloss.NewStyle().
-			Border(lipgloss.NormalBorder()).
-			BorderForeground(lipgloss.Cyan)
-
-	attachedStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Green).
-			Bold(true)
-
-	detachedStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.BrightBlack)
-
-	highlightStyle = lipgloss.NewStyle().
-			Background(lipgloss.Blue)
-)
-
-type sessionFinishedMsg struct{}
-
-// titledCmd wraps an exec.Cmd to set the terminal title before running.
-type titledCmd struct {
-	*exec.Cmd
-	title string
-}
-
-func (c *titledCmd) Run() error {
-	fmt.Fprintf(c.Stdout, "\033]0;%s\007", c.title)
-	return c.Cmd.Run()
-}
-
-func (c *titledCmd) SetStdin(r io.Reader) {
-	if c.Cmd.Stdin == nil {
-		c.Cmd.Stdin = r
-	}
-}
-
-func (c *titledCmd) SetStdout(w io.Writer) {
-	c.Cmd.Stdout = w
-}
-
-func (c *titledCmd) SetStderr(w io.Writer) {
-	if c.Cmd.Stderr == nil {
-		c.Cmd.Stderr = w
-	}
-}
 
 type model struct {
 	sessions      []session
@@ -69,6 +18,7 @@ type model struct {
 	height        int
 	selectedIndex int
 	printMode     bool
+	help          help.Model
 
 	treeData    *sessionTreeData
 	treeLoading bool
@@ -83,11 +33,11 @@ func (m model) Init() tea.Cmd {
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyPressMsg:
-		switch msg.String() {
-		case "q", "esc", "ctrl+c":
+		switch {
+		case key.Matches(msg, defaultKeyMap.Quit):
 			m.selectedIndex = -1
 			return m, tea.Quit
-		case "enter":
+		case key.Matches(msg, defaultKeyMap.Select):
 			if len(m.sessions) > 0 && m.cursor < len(m.sessions) {
 				if m.printMode {
 					m.selectedIndex = m.cursor
@@ -102,12 +52,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return sessionFinishedMsg{}
 				})
 			}
-		case "up", "k":
+		case key.Matches(msg, defaultKeyMap.Up):
 			if m.cursor > 0 {
 				m.cursor--
 			}
 			return m, m.loadTreeIfNeeded()
-		case "down", "j":
+		case key.Matches(msg, defaultKeyMap.Down):
 			if m.cursor < len(m.sessions)-1 {
 				m.cursor++
 			}
@@ -173,22 +123,31 @@ func indexToLabel(i int) string {
 
 func (m model) View() tea.View {
 	colWidth := m.width / 2
+	helpView := lipgloss.NewStyle().PaddingLeft(2).Render(m.help.View(defaultKeyMap))
+	helpHeight := lipgloss.Height(helpView)
+	panelHeight := m.height - 2 - helpHeight
+	if panelHeight < 1 {
+		panelHeight = 1
+	}
+
+	m.help.SetWidth(m.width)
 
 	left := leftStyle.
 		Width(colWidth).
-		Height(m.height - 2).
+		Height(panelHeight).
 		Render(m.renderLeft(colWidth))
 
 	right := rightStyle.
 		Width(colWidth).
-		Height(m.height - 2).
+		Height(panelHeight).
 		Render(m.renderRight())
 
 	content := lipgloss.JoinHorizontal(lipgloss.Top, left, right)
+	full := lipgloss.JoinVertical(lipgloss.Left, content, helpView)
 
-	v := tea.NewView(content)
+	v := tea.NewView(full)
 	v.AltScreen = true
-	v.WindowTitle = m.windowTitle()
+	v.WindowTitle = "switcher"
 	return v
 }
 
@@ -236,120 +195,4 @@ func (m model) renderLeft(colWidth int) string {
 	}
 
 	return s
-}
-
-func (m *model) loadTreeIfNeeded() tea.Cmd {
-	if len(m.sessions) == 0 || m.cursor >= len(m.sessions) {
-		return nil
-	}
-	sess := m.sessions[m.cursor]
-	if !sess.Running {
-		return nil
-	}
-	if m.treeLoading && m.treeFor == sess.Name {
-		return nil
-	}
-	if m.treeData != nil && m.treeFor == sess.Name && m.treeErr == nil {
-		return nil
-	}
-	m.treeLoading = true
-	m.treeFor = sess.Name
-	m.treeErr = nil
-	m.treeData = nil
-	return loadSessionTree(sess.Name)
-}
-
-func (m model) renderRight() string {
-	if len(m.sessions) == 0 || m.cursor >= len(m.sessions) {
-		return "Session Info\n\nNo session available."
-	}
-
-	sess := m.sessions[m.cursor]
-	header := fmt.Sprintf("Session: %s\n", sess.Name)
-
-	if !sess.Running {
-		return header + "\nNot running."
-	}
-
-	if m.treeLoading || (m.treeData == nil && m.treeErr == nil) {
-		return header + "\nLoading..."
-	}
-
-	if m.treeErr != nil {
-		return header + fmt.Sprintf("\nError: %v", m.treeErr)
-	}
-
-	contentWidth := m.width/2 - 2 // normal border: 1 char each side
-	return header + "\n" + m.buildTree(contentWidth)
-}
-
-func (m model) buildTree(width int) string {
-	data := m.treeData
-	if data == nil {
-		return ""
-	}
-
-	tabsByWS := make(map[string][]tabData)
-	for _, tab := range data.Tabs {
-		tabsByWS[tab.WorkspaceID] = append(tabsByWS[tab.WorkspaceID], tab)
-	}
-
-	panesByTab := make(map[string][]paneData)
-	for _, pane := range data.Panes {
-		panesByTab[pane.TabID] = append(panesByTab[pane.TabID], pane)
-	}
-
-	t := tree.New()
-	if width > 0 {
-		t.Width(width)
-	}
-
-	t.EnumeratorStyle(lipgloss.NewStyle().Foreground(lipgloss.BrightBlack))
-	t.IndenterStyle(lipgloss.NewStyle().Foreground(lipgloss.BrightBlack))
-	t.ItemStyleFunc(func(children tree.Children, i int) lipgloss.Style {
-		if strings.HasPrefix(children.At(i).Value(), "* ") {
-			return lipgloss.NewStyle().Foreground(lipgloss.Cyan).Bold(true)
-		}
-		return lipgloss.NewStyle()
-	})
-
-	for _, ws := range data.Workspaces {
-		wsTree := tree.Root(focusLabel(ws.Focused, ws.Label))
-
-		for _, tab := range tabsByWS[ws.WorkspaceID] {
-			tabTree := tree.Root(focusLabel(tab.Focused, fmt.Sprintf("Tab %s", tab.Label)))
-
-			for _, pane := range panesByTab[tab.TabID] {
-				tabTree.Child(focusLabel(pane.Focused, shortenPath(pane.Cwd)))
-			}
-
-			wsTree.Child(tabTree)
-		}
-
-		t.Child(wsTree)
-	}
-
-	return t.String()
-}
-
-func focusLabel(focused bool, label string) string {
-	if focused {
-		return "* " + label
-	}
-	return "  " + label
-}
-
-func shortenPath(path string) string {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return path
-	}
-	if strings.HasPrefix(path, home) {
-		return "~" + path[len(home):]
-	}
-	return path
-}
-
-func (m model) windowTitle() string {
-	return "switcher"
 }
