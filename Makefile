@@ -1,6 +1,8 @@
 PREFIX ?= $(HOME)/.local/bin
 
-.PHONY: build install clean
+.PHONY: all build install clean
+
+all: install
 
 build:
 	go build -o switcher .

@@ -72,6 +72,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.loadTreeIfNeeded()
 
 	case sessionFinishedMsg:
+		m.treeData = nil
+		m.treeFor = ""
+		m.treeLoading = false
+		m.treeErr = nil
 		return m, loadSessions
 
 	case treeDataMsg:
