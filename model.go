@@ -1,9 +1,6 @@
 package main
 
 import (
-	"fmt"
-	"os/exec"
-
 	"charm.land/bubbles/v2/help"
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
@@ -43,14 +40,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.selectedIndex = m.cursor
 					return m, tea.Quit
 				}
-				sess := m.sessions[m.cursor]
-				cmd := &titledCmd{
-					Cmd:   exec.Command("herdr", "session", "attach", sess.Name),
-					title: fmt.Sprintf("herdr: %s", sess.Name),
-				}
-				return m, tea.Exec(cmd, func(err error) tea.Msg {
-					return sessionFinishedMsg{}
-				})
+				return m, attachSessionCmd(m.sessions[m.cursor].Name)
 			}
 		case key.Matches(msg, defaultKeyMap.Up):
 			if m.cursor > 0 {
@@ -101,26 +91,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func keyToIndex(key string) (int, bool) {
-	if len(key) != 1 {
-		return 0, false
-	}
-	switch key[0] {
-	case '1', '2', '3', '4', '5', '6', '7', '8', '9':
-		return int(key[0] - '1'), true
-	case '0':
-		return 9, true
-	}
-	return 0, false
-}
-
-func indexToLabel(i int) string {
-	if i == 9 {
-		return "0"
-	}
-	return string(rune('1' + i))
-}
-
 func (m model) View() tea.View {
 	colWidth := m.width / 2
 	helpView := lipgloss.NewStyle().PaddingLeft(2).Render(m.help.View(defaultKeyMap))
@@ -149,50 +119,4 @@ func (m model) View() tea.View {
 	v.AltScreen = true
 	v.WindowTitle = "switcher"
 	return v
-}
-
-func (m model) renderLeft(colWidth int) string {
-	contentWidth := colWidth - 2 // normal border takes 1 char each side
-	s := "Herdr:\n\n"
-
-	if m.err != nil {
-		return s + fmt.Sprintf("Error: %v", m.err)
-	}
-	if m.sessions == nil {
-		return s + "Loading..."
-	}
-
-	for i, sess := range m.sessions {
-		cursor := "  "
-		if m.cursor == i {
-			cursor = "> "
-		}
-
-		status := "(detached)"
-		statusStyle := detachedStyle
-		if sess.Attached {
-			status = "(attached)"
-			statusStyle = attachedStyle
-		}
-
-		leftPart := cursor + "[" + indexToLabel(i) + "] " + sess.Name
-		remaining := max(contentWidth-lipgloss.Width(leftPart), 1)
-
-		if m.cursor == i {
-			// Plain style (no color) so ANSI reset doesn't clear highlight bg.
-			line := leftPart + lipgloss.NewStyle().
-				Width(remaining).
-				Align(lipgloss.Right).
-				Render(status)
-			line = highlightStyle.Width(contentWidth).Render(line)
-			s += line + "\n"
-		} else {
-			s += leftPart + statusStyle.
-				Width(remaining).
-				Align(lipgloss.Right).
-				Render(status) + "\n"
-		}
-	}
-
-	return s
 }

@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"io"
 	"os/exec"
+
+	tea "charm.land/bubbletea/v2"
 )
 
 type sessionFinishedMsg struct{}
@@ -33,4 +35,14 @@ func (c *titledCmd) SetStderr(w io.Writer) {
 	if c.Cmd.Stderr == nil {
 		c.Cmd.Stderr = w
 	}
+}
+
+func attachSessionCmd(name string) tea.Cmd {
+	cmd := &titledCmd{
+		Cmd:   exec.Command("herdr", "session", "attach", name),
+		title: fmt.Sprintf("herdr: %s", name),
+	}
+	return tea.Exec(cmd, func(err error) tea.Msg {
+		return sessionFinishedMsg{}
+	})
 }

@@ -39,3 +39,23 @@ func (k keyMap) FullHelp() [][]key.Binding {
 		{k.Select, k.Quit},
 	}
 }
+
+func keyToIndex(key string) (int, bool) {
+	if len(key) != 1 {
+		return 0, false
+	}
+	switch key[0] {
+	case '1', '2', '3', '4', '5', '6', '7', '8', '9':
+		return int(key[0] - '1'), true
+	case '0':
+		return 9, true
+	}
+	return 0, false
+}
+
+func indexToLabel(i int) string {
+	if i == 9 {
+		return "0"
+	}
+	return string(rune('1' + i))
+}

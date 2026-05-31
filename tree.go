@@ -31,6 +31,52 @@ func (m *model) loadTreeIfNeeded() tea.Cmd {
 	return loadSessionTree(sess.Name)
 }
 
+func (m model) renderLeft(colWidth int) string {
+	contentWidth := colWidth - 2 // normal border takes 1 char each side
+	s := "Herdr:\n\n"
+
+	if m.err != nil {
+		return s + fmt.Sprintf("Error: %v", m.err)
+	}
+	if m.sessions == nil {
+		return s + "Loading..."
+	}
+
+	for i, sess := range m.sessions {
+		cursor := "  "
+		if m.cursor == i {
+			cursor = "> "
+		}
+
+		status := "(detached)"
+		statusStyle := detachedStyle
+		if sess.Attached {
+			status = "(attached)"
+			statusStyle = attachedStyle
+		}
+
+		leftPart := cursor + "[" + indexToLabel(i) + "] " + sess.Name
+		remaining := max(contentWidth-lipgloss.Width(leftPart), 1)
+
+		if m.cursor == i {
+			// Plain style (no color) so ANSI reset doesn't clear highlight bg.
+			line := leftPart + lipgloss.NewStyle().
+				Width(remaining).
+				Align(lipgloss.Right).
+				Render(status)
+			line = highlightStyle.Width(contentWidth).Render(line)
+			s += line + "\n"
+		} else {
+			s += leftPart + statusStyle.
+				Width(remaining).
+				Align(lipgloss.Right).
+				Render(status) + "\n"
+		}
+	}
+
+	return s
+}
+
 func (m model) renderRight() string {
 	if len(m.sessions) == 0 || m.cursor >= len(m.sessions) {
 		return "Session Info\n\nNo session available."
