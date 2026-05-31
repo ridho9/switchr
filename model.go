@@ -15,21 +15,21 @@ import (
 var (
 	leftStyle = lipgloss.NewStyle().
 			Border(lipgloss.NormalBorder()).
-			BorderForeground(lipgloss.Color("63"))
+			BorderForeground(lipgloss.Magenta)
 
 	rightStyle = lipgloss.NewStyle().
 			Border(lipgloss.NormalBorder()).
-			BorderForeground(lipgloss.Color("204"))
+			BorderForeground(lipgloss.Cyan)
 
 	attachedStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("42")).
+			Foreground(lipgloss.Green).
 			Bold(true)
 
 	detachedStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("240"))
+			Foreground(lipgloss.BrightBlack)
 
 	highlightStyle = lipgloss.NewStyle().
-			Background(lipgloss.Color("24"))
+			Background(lipgloss.Blue)
 )
 
 type sessionFinishedMsg struct{}
@@ -303,6 +303,15 @@ func (m model) buildTree(width int) string {
 	if width > 0 {
 		t.Width(width)
 	}
+
+	t.EnumeratorStyle(lipgloss.NewStyle().Foreground(lipgloss.BrightBlack))
+	t.IndenterStyle(lipgloss.NewStyle().Foreground(lipgloss.BrightBlack))
+	t.ItemStyleFunc(func(children tree.Children, i int) lipgloss.Style {
+		if strings.HasPrefix(children.At(i).Value(), "* ") {
+			return lipgloss.NewStyle().Foreground(lipgloss.Cyan).Bold(true)
+		}
+		return lipgloss.NewStyle()
+	})
 
 	for _, ws := range data.Workspaces {
 		wsTree := tree.Root(focusLabel(ws.Focused, ws.Label))
