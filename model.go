@@ -2,9 +2,12 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"strings"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"charm.land/lipgloss/v2/tree"
 )
 
 var (
@@ -22,6 +25,9 @@ var (
 
 	detachedStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("240"))
+
+	highlightStyle = lipgloss.NewStyle().
+			Background(lipgloss.Color("24"))
 )
 
 type model struct {
@@ -31,6 +37,11 @@ type model struct {
 	width         int
 	height        int
 	selectedIndex int
+
+	treeData    *sessionTreeData
+	treeLoading bool
+	treeErr     error
+	treeFor     string
 }
 
 func (m model) Init() tea.Cmd {
@@ -53,13 +64,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.cursor > 0 {
 				m.cursor--
 			}
+			return m, m.loadTreeIfNeeded()
 		case "down", "j":
 			if m.cursor < len(m.sessions)-1 {
 				m.cursor++
 			}
+			return m, m.loadTreeIfNeeded()
 		default:
 			if n, ok := keyToIndex(msg.String()); ok && n >= 0 && n < len(m.sessions) {
 				m.cursor = n
+				return m, m.loadTreeIfNeeded()
 			}
 		}
 
@@ -72,6 +86,19 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.err = msg.err
 		} else {
 			m.sessions = msg.sessions
+		}
+		return m, m.loadTreeIfNeeded()
+
+	case treeDataMsg:
+		m.treeLoading = false
+		if msg.sessionName == m.treeFor {
+			if msg.err != nil {
+				m.treeErr = msg.err
+				m.treeData = nil
+			} else {
+				m.treeErr = nil
+				m.treeData = msg.data
+			}
 		}
 	}
 
@@ -104,12 +131,12 @@ func (m model) View() tea.View {
 	left := leftStyle.
 		Width(colWidth).
 		Height(m.height - 2).
-		Render(m.renderLeft())
+		Render(m.renderLeft(colWidth))
 
 	right := rightStyle.
 		Width(colWidth).
 		Height(m.height - 2).
-		Render(fmt.Sprintf("Right Panel\n\nResize to see layout."))
+		Render(m.renderRight())
 
 	content := lipgloss.JoinHorizontal(lipgloss.Top, left, right)
 
@@ -118,7 +145,8 @@ func (m model) View() tea.View {
 	return v
 }
 
-func (m model) renderLeft() string {
+func (m model) renderLeft(colWidth int) string {
+	contentWidth := colWidth - 2 // normal border takes 1 char each side
 	s := "Herdr:\n\n"
 
 	if m.err != nil {
@@ -141,13 +169,125 @@ func (m model) renderLeft() string {
 			statusStyle = attachedStyle
 		}
 
-		s += fmt.Sprintf("%s[%s] %s %s\n",
-			cursor,
-			indexToLabel(i),
-			sess.Name,
-			statusStyle.Render(status),
-		)
+		leftPart := cursor + "[" + indexToLabel(i) + "] " + sess.Name
+		styledStatus := statusStyle.Render(status)
+
+		visibleLeft := lipgloss.Width(leftPart)
+		visibleStatus := lipgloss.Width(status)
+		padding := contentWidth - visibleLeft - visibleStatus
+		if padding < 1 {
+			padding = 1
+		}
+
+		if m.cursor == i {
+			// Use plain status text so the highlight background isn't
+			// reset by the styled status's \x1b[0m.
+			line := leftPart + strings.Repeat(" ", padding) + status
+			line = highlightStyle.Width(contentWidth).Render(line)
+			s += line + "\n"
+		} else {
+			s += leftPart + strings.Repeat(" ", padding) + styledStatus + "\n"
+		}
 	}
 
 	return s
+}
+
+func (m *model) loadTreeIfNeeded() tea.Cmd {
+	if len(m.sessions) == 0 || m.cursor >= len(m.sessions) {
+		return nil
+	}
+	sess := m.sessions[m.cursor]
+	if !sess.Running {
+		return nil
+	}
+	if m.treeLoading && m.treeFor == sess.Name {
+		return nil
+	}
+	if m.treeData != nil && m.treeFor == sess.Name && m.treeErr == nil {
+		return nil
+	}
+	m.treeLoading = true
+	m.treeFor = sess.Name
+	m.treeErr = nil
+	m.treeData = nil
+	return loadSessionTree(sess.Name)
+}
+
+func (m model) renderRight() string {
+	if len(m.sessions) == 0 || m.cursor >= len(m.sessions) {
+		return "Session Info\n\nNo session available."
+	}
+
+	sess := m.sessions[m.cursor]
+	header := fmt.Sprintf("Session: %s\n", sess.Name)
+
+	if !sess.Running {
+		return header + "\nNot running."
+	}
+
+	if m.treeLoading || (m.treeData == nil && m.treeErr == nil) {
+		return header + "\nLoading..."
+	}
+
+	if m.treeErr != nil {
+		return header + fmt.Sprintf("\nError: %v", m.treeErr)
+	}
+
+	return header + "\n" + m.buildTree()
+}
+
+func (m model) buildTree() string {
+	data := m.treeData
+	if data == nil {
+		return ""
+	}
+
+	tabsByWS := make(map[string][]tabData)
+	for _, tab := range data.Tabs {
+		tabsByWS[tab.WorkspaceID] = append(tabsByWS[tab.WorkspaceID], tab)
+	}
+
+	panesByTab := make(map[string][]paneData)
+	for _, pane := range data.Panes {
+		panesByTab[pane.TabID] = append(panesByTab[pane.TabID], pane)
+	}
+
+	t := tree.New()
+
+	for _, ws := range data.Workspaces {
+		wsTree := tree.Root(focusLabel(ws.Focused, ws.Label))
+
+		for _, tab := range tabsByWS[ws.WorkspaceID] {
+			tabTree := tree.Root(focusLabel(tab.Focused, fmt.Sprintf("Tab %s", tab.Label)))
+
+			for _, pane := range panesByTab[tab.TabID] {
+				tabTree.Child(focusLabel(pane.Focused, shortenPath(pane.Cwd)))
+			}
+
+			wsTree.Child(tabTree)
+		}
+
+		t.Child(wsTree)
+	}
+
+	return t.String()
+}
+
+func focusLabel(focused bool, label string) string {
+	if focused {
+		return "* " + label
+	}
+	return "  " + label
+}
+
+func shortenPath(path string) string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return path
+	}
+	if strings.HasPrefix(path, home) {
+		return "~" + path[len(home):]
+	}
+	return path
 }
