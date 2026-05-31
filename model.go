@@ -1,9 +1,7 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
-	"os/exec"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -17,20 +15,14 @@ var (
 	rightStyle = lipgloss.NewStyle().
 			Border(lipgloss.NormalBorder()).
 			BorderForeground(lipgloss.Color("204"))
+
+	attachedStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("42")).
+			Bold(true)
+
+	detachedStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("240"))
 )
-
-type session struct {
-	Default    bool   `json:"default"`
-	Name       string `json:"name"`
-	Running    bool   `json:"running"`
-	SessionDir string `json:"session_dir"`
-	SocketPath string `json:"socket_path"`
-}
-
-type sessionsMsg struct {
-	sessions []session
-	err      error
-}
 
 type model struct {
 	sessions []session
@@ -42,22 +34,6 @@ type model struct {
 
 func (m model) Init() tea.Cmd {
 	return loadSessions
-}
-
-func loadSessions() tea.Msg {
-	out, err := exec.Command("herdr", "session", "list", "--json").Output()
-	if err != nil {
-		return sessionsMsg{err: err}
-	}
-
-	var result struct {
-		Sessions []session `json:"sessions"`
-	}
-	if err := json.Unmarshal(out, &result); err != nil {
-		return sessionsMsg{err: err}
-	}
-
-	return sessionsMsg{sessions: result.Sessions}
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -84,7 +60,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 
-	case sessionsMsg:
+	case sessionListMsg:
 		if msg.err != nil {
 			m.err = msg.err
 		} else {
@@ -93,26 +69,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	return m, nil
-}
-
-func (m model) View() tea.View {
-	colWidth := m.width / 2
-
-	left := leftStyle.
-		Width(colWidth).
-		Height(m.height - 2).
-		Render(m.renderLeft())
-
-	right := rightStyle.
-		Width(colWidth).
-		Height(m.height - 2).
-		Render(fmt.Sprintf("Right Panel\n\nResize to see layout."))
-
-	content := lipgloss.JoinHorizontal(lipgloss.Top, left, right)
-
-	v := tea.NewView(content)
-	v.AltScreen = true
-	return v
 }
 
 func keyToIndex(key string) (int, bool) {
@@ -135,6 +91,26 @@ func indexToLabel(i int) string {
 	return string(rune('1' + i))
 }
 
+func (m model) View() tea.View {
+	colWidth := m.width / 2
+
+	left := leftStyle.
+		Width(colWidth).
+		Height(m.height - 2).
+		Render(m.renderLeft())
+
+	right := rightStyle.
+		Width(colWidth).
+		Height(m.height - 2).
+		Render(fmt.Sprintf("Right Panel\n\nResize to see layout."))
+
+	content := lipgloss.JoinHorizontal(lipgloss.Top, left, right)
+
+	v := tea.NewView(content)
+	v.AltScreen = true
+	return v
+}
+
 func (m model) renderLeft() string {
 	s := "Herdr:\n\n"
 
@@ -150,7 +126,20 @@ func (m model) renderLeft() string {
 		if m.cursor == i {
 			cursor = "> "
 		}
-		s += fmt.Sprintf("%s[%s] - %s\n", cursor, indexToLabel(i), sess.Name)
+
+		status := "(detached)"
+		statusStyle := detachedStyle
+		if sess.Attached {
+			status = "(attached)"
+			statusStyle = attachedStyle
+		}
+
+		s += fmt.Sprintf("%s[%s] %s %s\n",
+			cursor,
+			indexToLabel(i),
+			sess.Name,
+			statusStyle.Render(status),
+		)
 	}
 
 	return s
