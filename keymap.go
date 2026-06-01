@@ -4,10 +4,11 @@ import "charm.land/bubbles/v2/key"
 
 // keyMap defines the keybindings for the switcher UI.
 type keyMap struct {
-	Up     key.Binding
-	Down   key.Binding
-	Select key.Binding
-	Quit   key.Binding
+	Up      key.Binding
+	Down    key.Binding
+	Select  key.Binding
+	Quit    key.Binding
+	Refresh key.Binding
 }
 
 var defaultKeyMap = keyMap{
@@ -27,16 +28,20 @@ var defaultKeyMap = keyMap{
 		key.WithKeys("q", "esc", "ctrl+c"),
 		key.WithHelp("q/esc", "quit"),
 	),
+	Refresh: key.NewBinding(
+		key.WithKeys("r"),
+		key.WithHelp("r", "refresh"),
+	),
 }
 
 func (k keyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.Up, k.Down, k.Select, k.Quit}
+	return []key.Binding{k.Up, k.Down, k.Select, k.Quit, k.Refresh}
 }
 
 func (k keyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{k.Up, k.Down},
-		{k.Select, k.Quit},
+		{k.Select, k.Quit, k.Refresh},
 	}
 }
 

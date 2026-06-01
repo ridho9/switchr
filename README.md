@@ -66,6 +66,7 @@ The launcher skips switcher and starts a normal shell when `$HERDR_SESSION` is a
 | 1–9, 0         | Jump to session       |
 | Enter          | Attach to session     |
 | q / esc / ^C   | Quit                  |
+| r              | Refresh sessions      |
 
 ## License
 

@@ -48,8 +48,12 @@ func (m model) renderLeft(colWidth, panelHeight int) string {
 	if m.err != nil {
 		return s + fmt.Sprintf("Error: %v", m.err)
 	}
+
 	if m.sessions == nil {
-		return s + "Loading..."
+		return "Herdr: " + spinnerStyle.Render(m.spinner.View()) + "\n\n"
+	}
+	if m.refreshing {
+		s = "Herdr: " + spinnerStyle.Render(m.spinner.View()) + "\n\n"
 	}
 	if len(m.sessions) == 0 {
 		return s + "No sessions."

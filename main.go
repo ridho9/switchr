@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 
+	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/term"
 )
@@ -35,7 +36,7 @@ func main() {
 	printMode := *printFlag || !term.IsTerminal(os.Stdout.Fd())
 
 	p := tea.NewProgram(
-		model{selectedIndex: -1, printMode: printMode, help: swHelp()},
+		model{selectedIndex: -1, printMode: printMode, help: swHelp(), spinner: spinner.New(spinner.WithSpinner(spinner.MiniDot))},
 		tea.WithInput(tty),
 		tea.WithOutput(tty),
 	)

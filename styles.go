@@ -29,6 +29,9 @@ var (
 
 	highlightStyle = lipgloss.NewStyle().
 			Background(lipgloss.Blue)
+
+	spinnerStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Cyan)
 )
 
 func swHelp() help.Model {

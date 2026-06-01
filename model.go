@@ -3,6 +3,7 @@ package main
 import (
 	"charm.land/bubbles/v2/help"
 	"charm.land/bubbles/v2/key"
+	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 )
@@ -17,6 +18,9 @@ type model struct {
 	selectedIndex int
 	printMode     bool
 	help          help.Model
+	spinner       spinner.Model
+
+	refreshing bool
 
 	treeData    *sessionTreeData
 	treeLoading bool
@@ -25,20 +29,49 @@ type model struct {
 }
 
 func (m model) Init() tea.Cmd {
-	return loadSessions
+	return m.refreshSessions()
 }
 
-func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+// refreshSessions starts the spinner and reloads the session list.
+func (m *model) refreshSessions() tea.Cmd {
+	m.err = nil
+	m.refreshing = true
+	return tea.Sequence(m.spinner.Tick, loadSessions)
+}
+
+func (m model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
+	skipSpinner := false
+	defer func() {
+		if skipSpinner {
+			return
+		}
+
+		var spinCmd tea.Cmd
+		if t, ok := msg.(spinner.TickMsg); ok {
+			m.spinner, spinCmd = m.spinner.Update(t)
+		}
+		if m.sessions != nil && !m.refreshing {
+			spinCmd = nil
+		}
+
+		next = m
+		cmd = tea.Batch(cmd, spinCmd)
+	}()
+
 	switch msg := msg.(type) {
 	case tea.KeyPressMsg:
 		switch {
 		case key.Matches(msg, defaultKeyMap.Quit):
 			m.selectedIndex = -1
+			skipSpinner = true
 			return m, tea.Quit
+		case key.Matches(msg, defaultKeyMap.Refresh):
+			return m, m.refreshSessions()
 		case key.Matches(msg, defaultKeyMap.Select):
 			if len(m.sessions) > 0 && m.cursor < len(m.sessions) {
 				if m.printMode {
 					m.selectedIndex = m.cursor
+					skipSpinner = true
 					return m, tea.Quit
 				}
 				return m, attachSessionCmd(m.sessions[m.cursor].Name)
@@ -70,9 +103,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.scrollToCursor()
 
 	case sessionListMsg:
+		m.refreshing = false
 		if msg.err != nil {
 			m.err = msg.err
 		} else {
+			m.err = nil
 			m.sessions = msg.sessions
 			m.clampBounds()
 		}
