@@ -216,6 +216,6 @@ func (m model) View() tea.View {
 
 	v := tea.NewView(full)
 	v.AltScreen = true
-	v.WindowTitle = "switcher"
+	v.WindowTitle = "switchr"
 	return v
 }

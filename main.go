@@ -22,7 +22,7 @@ func main() {
 	flag.Parse()
 
 	if *versionFlag {
-		fmt.Println("switcher", versionString())
+		fmt.Println("switchr", versionString())
 		os.Exit(0)
 	}
 

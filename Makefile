@@ -9,12 +9,12 @@ LDFLAGS  = -X main.Version=$(VERSION) -X main.Commit=$(COMMIT)
 all: install
 
 build:
-	go build -ldflags "$(LDFLAGS)" -o switcher .
+	go build -ldflags "$(LDFLAGS)" -o switchr .
 
 install: build
 	mkdir -p $(PREFIX)
-	install -m 755 switcher $(PREFIX)/switcher
+	install -m 755 switchr $(PREFIX)/switchr
 	install -m 755 contrib/term-launcher $(PREFIX)/term-launcher
 
 clean:
-	rm -f switcher
+	rm -f switchr

@@ -1,4 +1,4 @@
-# switcher
+# switchr
 
 A terminal TUI for browsing and attaching to [herdr](https://github.com/herdr/herdr) sessions.
 
@@ -18,7 +18,7 @@ make install PREFIX=/usr/local/bin
 Or via `go install` (binary only):
 
 ```sh
-go install github.com/ridho9/switcher@latest
+go install github.com/ridho9/switchr@latest
 ```
 
 ## Usage
@@ -26,7 +26,7 @@ go install github.com/ridho9/switcher@latest
 ### Interactive mode (default)
 
 ```sh
-switcher
+switchr
 ```
 
 Opens a full-screen TUI listing your herdr sessions. Navigate with arrow keys or vim keys, press enter to attach. When you detach from a session, the list reappears. Press q/esc to quit.
@@ -34,8 +34,8 @@ Opens a full-screen TUI listing your herdr sessions. Navigate with arrow keys or
 ### Pipe / print mode
 
 ```sh
-switcher --print          # explicit flag
-switcher | jq             # auto-detected when stdout is not a TTY
+switchr --print          # explicit flag
+switchr | jq             # auto-detected when stdout is not a TTY
 ```
 
 Outputs the selected session as JSON:
@@ -55,7 +55,7 @@ Copy `contrib/term-launcher` to your PATH (e.g. `~/.local/bin/`) and configure y
 | WezTerm   | `default_prog = { "/home/user/.local/bin/term-launcher" }` |
 | Alacritty | `shell = { program = "/home/user/.local/bin/term-launcher" }` |
 
-The launcher skips switcher and starts a normal shell when `$HERDR_SESSION` is already set (inside an existing herdr session).
+The launcher skips switchr and starts a normal shell when `$HERDR_SESSION` is already set (inside an existing herdr session).
 
 ### Keybindings
 

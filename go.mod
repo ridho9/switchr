@@ -1,4 +1,4 @@
-module github.com/ridho9/switcher
+module github.com/ridho9/switchr
 
 go 1.26.3
 

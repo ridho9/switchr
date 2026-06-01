@@ -2,7 +2,7 @@ package main
 
 import "charm.land/bubbles/v2/key"
 
-// keyMap defines the keybindings for the switcher UI.
+// keyMap defines the keybindings for the switchr UI.
 type keyMap struct {
 	Up      key.Binding
 	Down    key.Binding
