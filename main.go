@@ -16,8 +16,14 @@ type selection struct {
 }
 
 func main() {
+	versionFlag := flag.Bool("version", false, "Print version and exit")
 	printFlag := flag.Bool("print", false, "Print selection as JSON and exit (non-interactive mode)")
 	flag.Parse()
+
+	if *versionFlag {
+		fmt.Println("switcher", versionString())
+		os.Exit(0)
+	}
 
 	tty, err := os.OpenFile("/dev/tty", os.O_RDWR, 0)
 	if err != nil {
