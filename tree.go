@@ -44,7 +44,7 @@ func statusParts(sess session) (string, lipgloss.Style) {
 func (m model) renderLeft(colWidth, panelHeight int) string {
 	contentWidth := colWidth - borderWidth
 	s := "Herdr:"
-	if m.justRestarted {
+	if m.server.justRestarted {
 		s += " (restarted — select session)"
 	}
 	s += "\n\n"

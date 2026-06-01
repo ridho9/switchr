@@ -37,8 +37,8 @@ func (m restartModal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		next, cmd := m.inner.Update(msg)
 		if inner, ok := next.(model); ok {
 			m.inner = inner
-			if !inner.restartNeeded {
-				inner.justRestarted = true
+			if !inner.server.restartNeeded {
+				inner.server.justRestarted = true
 				return inner, cmd
 			}
 			return m, cmd

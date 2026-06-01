@@ -20,11 +20,16 @@ type session struct {
 }
 
 type sessionListMsg struct {
-	sessions      []session
-	err           error
+	sessions []session
+	err      error
+	server   serverStatus
+}
+
+type serverStatus struct {
 	restartNeeded bool
 	serverVersion string
 	clientVersion string
+	justRestarted bool
 }
 
 func loadSessions() tea.Msg {
@@ -86,9 +91,9 @@ func loadSessions() tea.Msg {
 	msg := sessionListMsg{sessions: result.Sessions}
 	s := <-statusCh
 	if s.Server.Version != "" && !s.Server.Compatible {
-		msg.restartNeeded = true
-		msg.serverVersion = s.Server.Version
-		msg.clientVersion = s.Client.Version
+		msg.server.restartNeeded = true
+		msg.server.serverVersion = s.Server.Version
+		msg.server.clientVersion = s.Client.Version
 	}
 
 	return msg
