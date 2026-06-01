@@ -38,8 +38,20 @@ func loadSessions() tea.Msg {
 		return sessionListMsg{err: err}
 	}
 
+	// Check attachment status concurrently — lsof is slow (~75ms each).
+	type attachResult struct {
+		i        int
+		attached bool
+	}
+	ch := make(chan attachResult, len(result.Sessions))
 	for i := range result.Sessions {
-		result.Sessions[i].Attached = isSessionAttached(result.Sessions[i].SocketPath)
+		go func(i int, socket string) {
+			ch <- attachResult{i: i, attached: isSessionAttached(socket)}
+		}(i, result.Sessions[i].SocketPath)
+	}
+	for range result.Sessions {
+		r := <-ch
+		result.Sessions[r.i].Attached = r.attached
 	}
 
 	return sessionListMsg{sessions: result.Sessions}
