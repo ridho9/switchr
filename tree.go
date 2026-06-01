@@ -108,7 +108,13 @@ func (m model) renderLeft(colWidth, panelHeight int) string {
 			iconStyle = runningStyle
 		}
 
-		prefix := cursor + "[" + indexToLabel(i) + "] "
+		label := indexToLabel(i)
+		prefix := cursor
+		if label != "" {
+			prefix += "[" + label + "] "
+		} else {
+			prefix += "    "
+		}
 		styledIcon := iconStyle.Render(icon)
 		leftPart := prefix + styledIcon + " " + sess.Name
 

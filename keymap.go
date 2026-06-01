@@ -59,6 +59,9 @@ func keyToIndex(key string) (int, bool) {
 }
 
 func indexToLabel(i int) string {
+	if i > 9 {
+		return ""
+	}
 	if i == 9 {
 		return "0"
 	}
