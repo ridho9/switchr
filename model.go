@@ -11,6 +11,10 @@ import (
 type model struct {
 	sessions      []session
 	err           error
+	restartNeeded bool
+	serverVersion string
+	clientVersion string
+	justRestarted bool
 	cursor        int
 	scrollOffset  int
 	width         int
@@ -35,6 +39,7 @@ func (m model) Init() tea.Cmd {
 // refreshSessions starts the spinner and reloads the session list.
 func (m *model) refreshSessions() tea.Cmd {
 	m.err = nil
+	m.restartNeeded = false
 	m.refreshing = true
 	return tea.Sequence(m.spinner.Tick, loadSessions)
 }
@@ -60,6 +65,7 @@ func (m model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tea.KeyPressMsg:
+		m.justRestarted = false
 		switch {
 		case key.Matches(msg, defaultKeyMap.Quit):
 			m.selectedIndex = -1
@@ -109,7 +115,14 @@ func (m model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 		} else {
 			m.err = nil
 			m.sessions = msg.sessions
+			m.restartNeeded = msg.restartNeeded
+			m.serverVersion = msg.serverVersion
+			m.clientVersion = msg.clientVersion
 			m.clampBounds()
+		}
+		if m.restartNeeded {
+			skipSpinner = true
+			return restartModal{inner: m, serverVer: msg.serverVersion, clientVer: msg.clientVersion}, nil
 		}
 		return m, m.loadTreeIfNeeded()
 

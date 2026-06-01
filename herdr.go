@@ -20,8 +20,11 @@ type session struct {
 }
 
 type sessionListMsg struct {
-	sessions []session
-	err      error
+	sessions      []session
+	err           error
+	restartNeeded bool
+	serverVersion string
+	clientVersion string
 }
 
 func loadSessions() tea.Msg {
@@ -49,12 +52,46 @@ func loadSessions() tea.Msg {
 			ch <- attachResult{i: i, attached: isSessionAttached(socket)}
 		}(i, result.Sessions[i].SocketPath)
 	}
+
+	// Check server compatibility concurrently.
+	type statusResult struct {
+		Server struct {
+			Compatible bool   `json:"compatible"`
+			Version    string `json:"version"`
+		} `json:"server"`
+		Client struct {
+			Version string `json:"version"`
+		} `json:"client"`
+	}
+	statusCh := make(chan statusResult, 1)
+	go func() {
+		out, err := exec.Command("herdr", "status", "--json").Output()
+		if err != nil {
+			statusCh <- statusResult{}
+			return
+		}
+		var s statusResult
+		if json.Unmarshal(out, &s) != nil {
+			statusCh <- statusResult{}
+			return
+		}
+		statusCh <- s
+	}()
+
 	for range result.Sessions {
 		r := <-ch
 		result.Sessions[r.i].Attached = r.attached
 	}
 
-	return sessionListMsg{sessions: result.Sessions}
+	msg := sessionListMsg{sessions: result.Sessions}
+	s := <-statusCh
+	if s.Server.Version != "" && !s.Server.Compatible {
+		msg.restartNeeded = true
+		msg.serverVersion = s.Server.Version
+		msg.clientVersion = s.Client.Version
+	}
+
+	return msg
 }
 
 func isSessionAttached(serverSocket string) bool {

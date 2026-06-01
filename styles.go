@@ -32,6 +32,9 @@ var (
 
 	spinnerStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Cyan)
+
+	warnStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Yellow)
 )
 
 func swHelp() help.Model {

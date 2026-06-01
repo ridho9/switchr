@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os/exec"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -45,4 +46,20 @@ func attachSessionCmd(name string) tea.Cmd {
 	return tea.Exec(cmd, func(err error) tea.Msg {
 		return sessionFinishedMsg{}
 	})
+}
+
+func restartHerderDaemon() tea.Msg {
+	exec.Command("herdr", "server", "stop").Run()
+	cmd := exec.Command("herdr", "server")
+	cmd.Start() // background: runs headless, doesn't attach
+
+	// Poll until the new server is ready to accept commands.
+	for i := 0; i < 30; i++ {
+		time.Sleep(200 * time.Millisecond)
+		if err := exec.Command("herdr", "status", "--json").Run(); err == nil {
+			break
+		}
+	}
+
+	return loadSessions()
 }
