@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.2.0
+
+### Features
+
+- **Incompatible server detection** — `switchr` checks `herdr status --json` while loading sessions and surfaces a restart modal when the daemon protocol is incompatible.
+- **Restart modal** — restart, dismiss, or quit directly from the modal; a successful restart reloads sessions automatically and shows a restart notice.
+
+### Maintenance
+
+- **Server status refactor** — grouped server-status fields into a `serverStatus` struct for cleaner state handling.
+
 ## v0.1.0
 
 Initial release.

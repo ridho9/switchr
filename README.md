@@ -68,6 +68,16 @@ The launcher skips switchr and starts a normal shell when `$HERDR_SESSION` is al
 | q / esc / ^C   | Quit                  |
 | r              | Refresh sessions      |
 
+### Incompatible herdr server
+
+If switchr detects that the running herdr daemon is using an incompatible protocol, it shows a restart modal instead of the session list.
+
+In that modal:
+
+- `y` — restart the daemon and reload sessions
+- `n` — dismiss the modal and continue
+- `q` or `Ctrl-C` — quit switchr
+
 ## License
 
 MIT
