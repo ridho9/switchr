@@ -1,5 +1,7 @@
 # switchr
 
+<img width="1548" height="1010" alt="image" src="https://github.com/user-attachments/assets/49cec3a0-5d07-46ab-9131-6f24c0987ad9" />
+
 A terminal TUI for browsing and attaching to [herdr](https://github.com/herdr/herdr) sessions.
 
 ## Install
@@ -69,6 +71,8 @@ The launcher skips switchr and starts a normal shell when `$HERDR_SESSION` is al
 | r              | Refresh sessions      |
 
 ### Incompatible herdr server
+
+<img width="1473" height="965" alt="image" src="https://github.com/user-attachments/assets/0c1bdb1f-38d5-4940-a1c5-e4b4d4d25fe7" />
 
 If switchr detects that the running herdr daemon is using an incompatible protocol, it shows a restart modal instead of the session list.
 
