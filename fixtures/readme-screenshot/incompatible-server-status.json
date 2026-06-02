@@ -1,0 +1,9 @@
+{
+  "server": {
+    "compatible": false,
+    "version": "0.6.5"
+  },
+  "client": {
+    "version": "0.6.6"
+  }
+}

@@ -146,7 +146,7 @@ func (m model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 }
 
 func (m model) panelContentHeight() int {
-	helpView := lipgloss.NewStyle().PaddingLeft(2).Render(m.help.View(defaultKeyMap))
+	helpView := lipgloss.NewStyle().PaddingLeft(2).PaddingBottom(1).Render(m.help.View(defaultKeyMap))
 	helpHeight := lipgloss.Height(helpView)
 	ph := m.height - helpHeight
 	if ph < 1 {
@@ -207,7 +207,7 @@ func (m model) View() tea.View {
 	colWidth := m.width / 2
 	m.help.SetWidth(m.width)
 	panelHeight := m.panelContentHeight()
-	helpView := lipgloss.NewStyle().PaddingLeft(2).Render(m.help.View(defaultKeyMap))
+	helpView := lipgloss.NewStyle().PaddingLeft(2).PaddingBottom(1).Render(m.help.View(defaultKeyMap))
 
 	left := leftStyle.
 		Width(colWidth).
